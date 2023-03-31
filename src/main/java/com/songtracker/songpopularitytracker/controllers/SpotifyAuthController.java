@@ -47,7 +47,7 @@ public class SpotifyAuthController {
         this.state = generateState();
         AuthorizationCodeUriRequest authorizationCodeUriRequest = spotifyApi.authorizationCodeUri()
                 .state(state)
-                .scope("user-read-private user-read-email")
+                .scope("user-read-private user-read-email user-top-read")
                 .show_dialog(true)
                 .build();
         URI authorizationUri = authorizationCodeUriRequest.execute();
@@ -106,8 +106,11 @@ public class SpotifyAuthController {
 
         user = getCurrentUser();
         user.setId(sequenceService.generateSequence(User.SEQUENCE_NAME));
-        userService.saveUser(user);
+        // check if user already exists
+        if (userService.existsById(user.getSpotifyId()))
+            return ResponseEntity.status(HttpServletResponse.SC_CONFLICT).build();
 
+        userService.saveUser(user);
 
         return ResponseEntity.ok(user);
     }

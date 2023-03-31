@@ -5,6 +5,8 @@ import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.List;
+
 @Document(collection = "users")
 public class User {
     @Transient
@@ -19,6 +21,7 @@ public class User {
     private String accessToken;
     private String refreshToken;
 
+    private List<Song> topTracks;
     public User() {
     }
 

@@ -1,5 +1,7 @@
 package com.songtracker.songpopularitytracker.services;
 
+import com.songtracker.songpopularitytracker.models.TopTracks;
+import com.songtracker.songpopularitytracker.utils.TopTrackType;
 import com.songtracker.songpopularitytracker.models.Song;
 import com.songtracker.songpopularitytracker.repository.SpotifyRepository;
 import org.springframework.beans.factory.annotation.Autowired;

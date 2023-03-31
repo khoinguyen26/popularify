@@ -16,7 +16,9 @@ public class Song {
     private String album;
 
     private int popularity;
+    private String imageUrl;
 
+    private String spotifyId;
     public Song() {
     }
 
@@ -65,5 +67,13 @@ public class Song {
 
     public void setPopularity(int popularity) {
         this.popularity = popularity;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 }

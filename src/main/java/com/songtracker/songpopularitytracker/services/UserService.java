@@ -19,4 +19,12 @@ public class UserService {
     }
 
 
+    public boolean existsById(String spotifyId) {
+        return userRepository.existsById(spotifyId);
+    }
+
+    // get user by id
+    public User getUserById(String spotifyId) {
+        return userRepository.findById(spotifyId).orElse(null);
+    }
 }
