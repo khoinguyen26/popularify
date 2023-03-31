@@ -13,11 +13,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.hc.core5.http.ParseException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import se.michaelthelin.spotify.SpotifyApi;
 import se.michaelthelin.spotify.exceptions.SpotifyWebApiException;
 import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
+import se.michaelthelin.spotify.requests.authorization.authorization_code.AuthorizationCodeRefreshRequest;
 import se.michaelthelin.spotify.requests.authorization.authorization_code.AuthorizationCodeRequest;
 import se.michaelthelin.spotify.requests.authorization.authorization_code.AuthorizationCodeUriRequest;
 
@@ -31,26 +33,22 @@ import java.util.Base64;
 @Tag(name = "Spotify Auth", description = "Spotify Auth API")
 public class SpotifyAuthController {
     private SpotifyApi spotifyApi;
-    private String state;
+
     private UserService userService;
     private SequenceService sequenceService;
+
 
     @Autowired
     public SpotifyAuthController(SpotifyApi spotifyApi, UserService userService, SequenceService sequenceService) {
         this.spotifyApi = spotifyApi;
         this.userService = userService;
         this.sequenceService = sequenceService;
+
     }
 
     @GetMapping("/login")
     public String login(HttpServletResponse response) throws IOException {
-        this.state = generateState();
-        AuthorizationCodeUriRequest authorizationCodeUriRequest = spotifyApi.authorizationCodeUri()
-                .state(state)
-                .scope("user-read-private user-read-email user-top-read")
-                .show_dialog(true)
-                .build();
-        URI authorizationUri = authorizationCodeUriRequest.execute();
+        URI authorizationUri = userService.authorizeUri();
         if (authorizationUri != null && authorizationUri.toString().length() > 0) {
             response.sendRedirect(authorizationUri.toString());
             return authorizationUri.toString();
@@ -62,24 +60,21 @@ public class SpotifyAuthController {
 
 
     @GetMapping("/access-tkn")
-    public String callback(@RequestParam("code") String code, @RequestParam("state") String state) throws IOException, ParseException, SpotifyWebApiException {
-        if (!this.state.equals(state))
-            throw new RuntimeException("State mismatch");
-        AuthorizationCodeRequest authorizationCodeRequest = spotifyApi.authorizationCode(code).build();
-        AuthorizationCodeCredentials authorizationCodeCredentials = authorizationCodeRequest.execute();
-        spotifyApi.setAccessToken(authorizationCodeCredentials.getAccessToken());
-        spotifyApi.setRefreshToken(authorizationCodeCredentials.getRefreshToken());
+    public ResponseEntity<String> callback(@RequestParam("code") String code, @RequestParam("state") String state) throws IOException, ParseException, SpotifyWebApiException {
+        String stateFromServer = userService.getState();
+        if (stateFromServer == null || !stateFromServer.equals(state)) {
+            return ResponseEntity.badRequest().body("State value did not match");
+        }
 
-        return "redirect:/";
+        AuthorizationCodeCredentials authorizationCodeCredentials = userService.getAccessAndRefreshTokens(code);
+        if (authorizationCodeCredentials == null) {
+            return ResponseEntity.badRequest().body("Error getting access token");
+        }
+
+
+        return ResponseEntity.ok("Access token: " + authorizationCodeCredentials.getAccessToken() + " Refresh token: " + authorizationCodeCredentials.getRefreshToken());
     }
 
-
-    private String generateState() {
-        SecureRandom secureRandom = new SecureRandom();
-        byte[] stateBytes = new byte[32];
-        secureRandom.nextBytes(stateBytes);
-        return Base64.getUrlEncoder().encodeToString(stateBytes);
-    }
 
     // get current user
     private User getCurrentUser() throws IOException, ParseException, SpotifyWebApiException {
@@ -114,5 +109,17 @@ public class SpotifyAuthController {
 
         return ResponseEntity.ok(user);
     }
+
+    // refresh access token
+    @GetMapping("/refresh")
+    @Operation(summary = "Refresh access token", description = "Refresh access token")
+    public ResponseEntity<String> refreshAccessToken() throws IOException, ParseException, SpotifyWebApiException {
+        AuthorizationCodeCredentials authorizationCodeCredentials = userService.refreshAccessToken();
+        if (authorizationCodeCredentials == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok("Access token refreshed");
+    }
+
 
 }
