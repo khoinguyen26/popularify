@@ -4,10 +4,7 @@ import com.songtracker.songpopularitytracker.DTO.ApiResponse;
 import com.songtracker.songpopularitytracker.models.Song;
 import com.songtracker.songpopularitytracker.models.TopTracks;
 import com.songtracker.songpopularitytracker.models.User;
-import com.songtracker.songpopularitytracker.services.SequenceService;
-import com.songtracker.songpopularitytracker.services.SongService;
-import com.songtracker.songpopularitytracker.services.TopTracksService;
-import com.songtracker.songpopularitytracker.services.UserService;
+import com.songtracker.songpopularitytracker.services.*;
 import com.songtracker.songpopularitytracker.utils.TopTrackType;
 import io.swagger.v3.oas.annotations.Operation;
 import org.apache.hc.core5.http.ParseException;
@@ -35,77 +32,31 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequestMapping("/users")
 public class UserController {
 
-    private SpotifyApi spotifyApi;
+
     private TopTracksService topTracksService;
-    private UserService userService;
-    private SequenceService sequenceService;
+    private SpotifyService spotifyService;
+
 
     @Autowired
-    public UserController(SpotifyApi spotifyApi, SequenceService sequenceService, UserService userService, TopTracksService topTracksService) {
-        this.spotifyApi = spotifyApi;
-        this.sequenceService = sequenceService;
-        this.userService = userService;
+    public UserController(TopTracksService topTracksService, SpotifyService spotifyService) {
         this.topTracksService = topTracksService;
+        this.spotifyService = spotifyService;
     }
 
     @GetMapping("/top-tracks")
     @Operation(summary = "Get user's top tracks")
     public ResponseEntity<ApiResponse<List<TopTracks>>> getUserTop() {
-        List<TopTracks> songs = new ArrayList<>();
-        AtomicReference<String> userId = new AtomicReference<>("");
-        ApiResponse<List<TopTracks>> response = new ApiResponse<>();
-
         try {
-            userId.set(spotifyApi.getCurrentUsersProfile().build().execute().getId());
-            GetUsersTopTracksRequest getUsersTopTracksRequest = spotifyApi.getUsersTopTracks()
-                    .build();
-            Paging<Track> trackPaging = getUsersTopTracksRequest.execute();
-            Track[] tracks = trackPaging.getItems();
-
-            List<CompletableFuture<TopTracks>> futures = new ArrayList<>();
-            for (Track track : tracks) {
-                CompletableFuture<TopTracks> topTracks = CompletableFuture.supplyAsync(() -> {
-                    TopTracks topTrack = new TopTracks();
-                    topTrack.setSongId(track.getId());
-                    topTrack.setName(track.getName());
-                    topTrack.setArtist(track.getArtists()[0].getName());
-                    topTrack.setPopularity(track.getPopularity());
-                    topTrack.setUri(track.getUri());
-                    topTrack.setAlbum(track.getAlbum().getName());
-                    topTrack.setAlbumImage(track.getAlbum().getImages()[0].getUrl());
-                    topTrack.setUserId(userId.get());
-
-                    return topTrack;
-                });
-                futures.add(topTracks);
+            CompletableFuture<List<TopTracks>> futureTopTracks = spotifyService.getUserTopTracksAsync();
+            List<TopTracks> topTracks = futureTopTracks.get();
+            for (TopTracks topTrack : topTracks) {
+                topTracksService.saveTopTracks(topTrack);
             }
-            CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]));
-            allFutures.get();
-
-            for (CompletableFuture<TopTracks> future : futures) {
-                TopTracks topTrack = future.get();
-                // check if top track exists
-                if (topTrack != null) {
-                    songs.add(topTrack);
-                }
-            }
-
-            // save top tracks
-            for (TopTracks song : songs) {
-                topTracksService.saveTopTracks(song);
-            }
-
-            response.setMessage("Top tracks retrieved successfully");
-            response.setData(songs);
-
+            ApiResponse<List<TopTracks>> response = new ApiResponse<>("User's top tracks fetched successfully.", topTracks);
             return ResponseEntity.ok(response);
-        } catch (IOException | SpotifyWebApiException | ParseException e) {
+        } catch (Exception e) {
             e.printStackTrace();
-            return null;
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

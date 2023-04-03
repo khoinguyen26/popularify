@@ -11,13 +11,5 @@ import se.michaelthelin.spotify.SpotifyApi;
 @RequestMapping("/tracks")
 @Tag(name = "Tracks", description = "API to get tracks info")
 public class TracksController {
-    private SongService songService;
-    private SpotifyApi spotifyApi;
-
-    @Autowired
-    public TracksController(SongService songService, SpotifyApi spotifyApi) {
-        this.songService = songService;
-        this.spotifyApi = spotifyApi;
-    }
 
 }

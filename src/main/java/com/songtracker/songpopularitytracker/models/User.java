@@ -9,13 +9,9 @@ import java.util.List;
 
 @Document(collection = "users")
 public class User {
-    @Transient
-    public static final String SEQUENCE_NAME = "users_sequence";
     @Id
-    private long id;
+    private String id;
 
-    @Indexed(unique = true)
-    private String spotifyId;
     private String name;
     private String email;
     private String accessToken;
@@ -25,7 +21,7 @@ public class User {
     public User() {
     }
 
-    public User(long id, String name, String email, String accessToken, String refreshToken) {
+    public User(String id, String name, String email, String accessToken, String refreshToken) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -33,11 +29,11 @@ public class User {
         this.refreshToken = refreshToken;
     }
 
-    public long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -73,11 +69,4 @@ public class User {
         this.refreshToken = refreshToken;
     }
 
-    public String getSpotifyId() {
-        return spotifyId;
-    }
-
-    public void setSpotifyId(String spotifyId) {
-        this.spotifyId = spotifyId;
-    }
 }

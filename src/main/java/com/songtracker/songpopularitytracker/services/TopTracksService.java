@@ -1,6 +1,7 @@
 package com.songtracker.songpopularitytracker.services;
 
 import com.songtracker.songpopularitytracker.models.TopTracks;
+import com.songtracker.songpopularitytracker.models.User;
 import com.songtracker.songpopularitytracker.repository.TopTracksRepository;
 import org.apache.hc.core5.http.ParseException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,12 +25,14 @@ public class TopTracksService {
 
     private SpotifyApi spotifyApi;
     private Environment env;
+    private UserService userService;
 
     @Autowired
-    public TopTracksService(TopTracksRepository topTracksRepository, SpotifyApi spotifyApi, Environment env) {
+    public TopTracksService(TopTracksRepository topTracksRepository, SpotifyApi spotifyApi, Environment env, UserService userService) {
         this.topTracksRepository = topTracksRepository;
         this.spotifyApi = spotifyApi;
         this.env = env;
+        this.userService = userService;
         spotifyApi.setAccessToken(env.getProperty("spotify.access-token"));
     }
 
@@ -59,6 +62,9 @@ public class TopTracksService {
 
 
     public void updateTopTracksPopularityPeriod() throws IOException, ParseException, SpotifyWebApiException {
+        // set access token
+        User user = userService.getCurrentUser();
+        userService.setAccessAndRefreshTokens(user);
         List<TopTracks> currentTopTracks = topTracksRepository.findAll();
         List<TopTracks> updatedTopTracks = getTopTracksFromSpotify();
 

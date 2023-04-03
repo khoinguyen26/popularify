@@ -2,6 +2,7 @@ package com.songtracker.songpopularitytracker.services;
 
 import com.songtracker.songpopularitytracker.models.User;
 import com.songtracker.songpopularitytracker.repository.UserRepository;
+import com.songtracker.songpopularitytracker.utils.StateGenerator;
 import org.apache.hc.core5.http.ParseException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -24,11 +25,15 @@ public class UserService {
     private SpotifyApi spotifyApi;
     private String state;
     private Environment env;
+
+    private StateGenerator stateGenerator;
+
     @Autowired
-    public UserService(UserRepository userRepository, SpotifyApi spotifyApi, Environment env) {
+    public UserService(UserRepository userRepository, SpotifyApi spotifyApi, Environment env, StateGenerator stateGenerator) {
         this.userRepository = userRepository;
         this.spotifyApi = spotifyApi;
         this.env = env;
+        this.stateGenerator = stateGenerator;
         spotifyApi.setAccessToken(env.getProperty("spotify.access-token"));
         spotifyApi.setRefreshToken(env.getProperty("spotify.refresh-token"));
     }
@@ -37,18 +42,31 @@ public class UserService {
         userRepository.save(user);
     }
 
-
-    public boolean existsById(String spotifyId) {
-        return userRepository.existsById(spotifyId);
+    // get current user
+    public User getCurrentUser() throws IOException, ParseException, SpotifyWebApiException {
+        User user = new User();
+        user.setId(spotifyApi.getCurrentUsersProfile().build().execute().getId());
+        user.setName(spotifyApi.getCurrentUsersProfile().build().execute().getDisplayName());
+        user.setEmail(spotifyApi.getCurrentUsersProfile().build().execute().getEmail());
+        user.setAccessToken(spotifyApi.getAccessToken());
+        user.setRefreshToken(spotifyApi.getRefreshToken());
+        return user;
     }
 
-    // get user by id
-    public User getUserById(String spotifyId) {
-        return userRepository.findById(spotifyId).orElse(null);
+    public boolean existsById(String id) {
+        return userRepository.existsById(id);
     }
+
+
+    // get user access and refresh tokens from database and set them to spotifyApi
+    public void setAccessAndRefreshTokens(User user) {
+        spotifyApi.setAccessToken(user.getAccessToken());
+        spotifyApi.setRefreshToken(user.getRefreshToken());
+    }
+
 
     public URI authorizeUri() {
-        this.state = generateState();
+        this.state = stateGenerator.generateState();
         AuthorizationCodeUriRequest authorizationCodeUriRequest = spotifyApi.authorizationCodeUri()
                 .state(state)
                 .scope("user-read-private user-read-email user-top-read")
@@ -59,12 +77,6 @@ public class UserService {
         return uri;
     }
 
-    private String generateState() {
-        SecureRandom secureRandom = new SecureRandom();
-        byte[] stateBytes = new byte[32];
-        secureRandom.nextBytes(stateBytes);
-        return Base64.getUrlEncoder().encodeToString(stateBytes);
-    }
 
     public String getState() {
         return state;
@@ -87,9 +99,11 @@ public class UserService {
 
 
     public AuthorizationCodeCredentials refreshAccessToken() throws IOException, ParseException, SpotifyWebApiException {
+        User user = getCurrentUser();
+        setAccessAndRefreshTokens(user);
         AuthorizationCodeRefreshRequest authorizationCodeRefreshRequest = spotifyApi.authorizationCodeRefresh().build();
         AuthorizationCodeCredentials authorizationCodeCredentials = authorizationCodeRefreshRequest.execute();
-            spotifyApi.setAccessToken(authorizationCodeCredentials.getAccessToken());
+        spotifyApi.setAccessToken(authorizationCodeCredentials.getAccessToken());
 
 
         return authorizationCodeCredentials;

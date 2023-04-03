@@ -32,17 +32,14 @@ import java.util.Base64;
 @RequestMapping("/auth")
 @Tag(name = "Spotify Auth", description = "Spotify Auth API")
 public class SpotifyAuthController {
-    private SpotifyApi spotifyApi;
+
 
     private UserService userService;
-    private SequenceService sequenceService;
 
 
     @Autowired
-    public SpotifyAuthController(SpotifyApi spotifyApi, UserService userService, SequenceService sequenceService) {
-        this.spotifyApi = spotifyApi;
+    public SpotifyAuthController(UserService userService) {
         this.userService = userService;
-        this.sequenceService = sequenceService;
 
     }
 
@@ -76,17 +73,6 @@ public class SpotifyAuthController {
     }
 
 
-    // get current user
-    private User getCurrentUser() throws IOException, ParseException, SpotifyWebApiException {
-        User user = new User();
-        user.setSpotifyId(spotifyApi.getCurrentUsersProfile().build().execute().getId());
-        user.setName(spotifyApi.getCurrentUsersProfile().build().execute().getDisplayName());
-        user.setEmail(spotifyApi.getCurrentUsersProfile().build().execute().getEmail());
-        user.setAccessToken(spotifyApi.getAccessToken());
-        user.setRefreshToken(spotifyApi.getRefreshToken());
-        return user;
-    }
-
     // save current user
     @PostMapping("/save")
     @Operation(summary = "Save current user", description = "Save current user to database")
@@ -99,13 +85,12 @@ public class SpotifyAuthController {
     public ResponseEntity<User> saveUser() throws IOException, ParseException, SpotifyWebApiException {
         User user = null;
 
-        user = getCurrentUser();
-        user.setId(sequenceService.generateSequence(User.SEQUENCE_NAME));
+        user = userService.getCurrentUser();
         // check if user already exists
-        if (userService.existsById(user.getSpotifyId()))
-            return ResponseEntity.status(HttpServletResponse.SC_CONFLICT).build();
-
-        userService.saveUser(user);
+        if (userService.existsById(user.getId()))
+            userService.setAccessAndRefreshTokens(user);
+        else
+            userService.saveUser(user);
 
         return ResponseEntity.ok(user);
     }
